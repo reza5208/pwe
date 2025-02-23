@@ -4,8 +4,9 @@ const urlsToCache = [
     "/styles.css",
     "/script.js",
     "/manifest.json",
-    "/icon-192x192.png",
-    "/icon-512x512.png"
+    "/assets/icons/favicon.ico",
+    "/assets/icons/apple-icon-57x57.png",
+    "/assets/icons/android-icon-192x192.png"
 ];
 
 // Install the service worker and cache assets
