@@ -21,7 +21,7 @@
     <link rel="icon" type="image/png" sizes="96x96" href="/assets/icons/favicon-96x96.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png">
     <!-- Manifest File -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileColor" content="#ffffff">
     <meta name="msapplication-TileImage" content="/assets/icons/ms-icon-144x144.png">
@@ -117,7 +117,7 @@
 <script>
     if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
-            navigator.serviceWorker.register("/sw.js").then(registration => {
+            navigator.serviceWorker.register("/.sw.js").then(registration => {
                 console.log("Service Worker registered with scope:", registration.scope);
             }).catch(error => {
                 console.error("Service Worker registration failed:", error);
