@@ -270,7 +270,9 @@ function exportToPDF() {
     doc.text(`Nama Ketua: ${localStorage.getItem("supervisorName") || "Talib"}`, 14, 36);
 
     const tableData = [];
-    Object.keys(dailyRecords).forEach(date => {
+    Object.keys(dailyRecords)
+    .sort((a, b) => new Date(a) - new Date(b)) // Susun ikut tarikh
+    .forEach(date => {
         const record = dailyRecords[date];
         tableData.push([
             formatDateForPDF(date),
