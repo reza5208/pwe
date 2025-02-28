@@ -15,8 +15,19 @@
     <script type="module">
         // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            query,
+            where,
+            getDocs,
+            deleteDoc,
+            doc,
+            setDoc,
+            onSnapshot,
+        } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -26,7 +37,7 @@
             storageBucket: "reza-apps.appspot.com",
             messagingSenderId: "196496135130",
             appId: "1:196496135130:web:485aac30a76493eb27a6e3",
-            measurementId: "G-5F0RW3KX43"
+            measurementId: "G-5F0RW3KX43",
         };
 
         // Initialize Firebase
@@ -34,10 +45,25 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
+        // Firestore collections
+        const tripsCollection = collection(db, "trips");
+        const recordsCollection = collection(db, "dailyRecords");
+
         // Expose Firebase instances globally
         window.firebaseApp = app;
         window.db = db;
         window.auth = auth;
+        window.tripsCollection = tripsCollection;
+        window.recordsCollection = recordsCollection;
+
+        // Listen for authentication state changes
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("User is signed in:", user.uid);
+            } else {
+                console.log("No user is signed in.");
+            }
+        });
     </script>
 </head>
 <body>
@@ -116,7 +142,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
 <!-- Main Script -->
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 
 <script>
     if ("serviceWorker" in navigator) {
@@ -129,6 +155,5 @@
         });
     }
 </script>
-
 </body>
 </html>
