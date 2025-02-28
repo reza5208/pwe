@@ -1,3 +1,72 @@
+import { collection, addDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+
+// Function to migrate local storage data to Firestore
+async function migrateDataToFirestore() {
+    try {
+        // Check if the user is authenticated
+        if (!auth.currentUser) {
+            alert("Sila log masuk untuk mula memindahkan data.");
+            return;
+        }
+
+        const userId = auth.currentUser.uid;
+
+        // Read trips from local storage
+        const tripsFromLocalStorage = JSON.parse(localStorage.getItem("trips")) || [];
+        const tripsCollectionRef = collection(db, "trips");
+
+        // Upload trips to Firestore
+        for (const trip of tripsFromLocalStorage) {
+            await addDoc(tripsCollectionRef, {
+                userId: userId,
+                trip: trip,
+            });
+        }
+        console.log("Trips berjaya dimuat naik ke Firestore.");
+
+        // Read daily records from local storage
+        const currentMonthKey = getCurrentMonthYear();
+        const dailyRecordsFromLocalStorage = JSON.parse(localStorage.getItem(`dailyRecords_${currentMonthKey}`)) || {};
+        const recordsCollectionRef = collection(db, "dailyRecords");
+
+        // Upload daily records to Firestore
+        for (const [date, record] of Object.entries(dailyRecordsFromLocalStorage)) {
+            const recordRef = doc(recordsCollectionRef, `${userId}_${date}`);
+            await setDoc(recordRef, {
+                userId: userId,
+                date: date,
+                clock_in: record.clock_in || "",
+                clock_out: record.clock_out || "",
+                trips: record.trips || [],
+            });
+        }
+        console.log("Rekod harian berjaya dimuat naik ke Firestore.");
+
+        // Optional: Clear local storage after migration
+        localStorage.removeItem("trips");
+        localStorage.removeItem(`dailyRecords_${currentMonthKey}`);
+        console.log("Data tempatan telah dibersihkan.");
+
+        alert("Data berjaya dipindahkan ke Firestore!");
+    } catch (error) {
+        console.error("Ralat semasa pemindahan data:", error);
+        alert("Ralat semasa pemindahan data. Sila cuba lagi.");
+    }
+}
+
+// Helper function to get the current month and year
+function getCurrentMonthYear() {
+    const date = new Date();
+    const monthNames = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ];
+    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+// Call the migration function
+migrateDataToFirestore();
+
 // Constants
 const defaultTrips = [
     "KLIA Cargo", "MBG KLIA2", "MBG 163", "MBG AEON Maluri", "MBG NU Sentral",
