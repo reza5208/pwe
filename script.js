@@ -1,24 +1,24 @@
 // Constants
 const defaultTrips = [
     "KLIA Cargo", "MBG KLIA2", "MBG 163", "MBG AEON Maluri", "MBG NU Sentral",
-    "MBG DPulze", "MBG Setapak Sentral", "MBG Selayang", "MBG Nilai", "MBG Redtick",
+    "MBG DPulze", "MBG Setapak Sentral", "MBG Selayang", "MBG Nil ai", "MBG Redtick",
     "MBG AEON Shah Alam", "MBG IOI Putrajaya", "MBG MRT", "MBG Pavilion Bukit Jalil",
     "MBG Ampang", "MBG Bangsar", "MBG Setia Alam", "MBG Kota Damansara"
 ];
 
 // State
-let trips = JSON.parse(localStorage.getItem("trips")) || defaultTrips;
+let trips = [];
 let currentMonthKey = getCurrentMonthYear();
-let dailyRecords = JSON.parse(localStorage.getItem(`dailyRecords_${currentMonthKey}`)) || {};
+let dailyRecords = {};
 
 // On page load
-document.addEventListener("DOMContentLoaded", () => {
-    initializePage();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initializePage();
     setupEventListeners();
 });
 
 // Initialize the page
-function initializePage() {
+async function initializePage() {
     const monthYearInput = document.getElementById("monthYear");
     const currentDate = new Date();
     monthYearInput.value = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
@@ -26,8 +26,9 @@ function initializePage() {
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
     document.getElementById("currentMonth").textContent = currentMonthKey;
     document.getElementById("supervisorName").textContent = localStorage.getItem("supervisorName") || "Talib";
-    loadTrips();
-    updateReport();
+
+    await loadTrips();
+    await loadRecords();
 }
 
 // Set up event listeners
@@ -40,15 +41,14 @@ function setupEventListeners() {
     document.getElementById("printButton").addEventListener("click", printReport);
     document.getElementById("exportPDF").addEventListener("click", exportToPDF);
 
-    setInterval(saveToLocal, 5000); // Auto-save every 5 seconds
+    listenForUpdates(); // Listen for real-time updates
 }
 
 // Handle month change
-function handleMonthChange() {
+async function handleMonthChange() {
     const [year, month] = this.value.split("-");
     currentMonthKey = `${getMonthName(month)} ${year}`;
-    dailyRecords = JSON.parse(localStorage.getItem(`dailyRecords_${currentMonthKey}`)) || {};
-    updateReport();
+    await loadRecords();
 }
 
 // Handle destination change
@@ -63,13 +63,19 @@ function handleDestinationChange() {
 }
 
 // Handle add trip
-function handleAddTrip() {
+async function handleAddTrip() {
     const newTrip = document.getElementById("newTrip").value.trim();
     if (newTrip) {
         if (!trips.includes(newTrip)) {
             trips.push(newTrip);
-            localStorage.setItem("trips", JSON.stringify(trips));
-            loadTrips();
+
+            // Save to Firestore
+            await addDoc(tripsCollection, {
+                userId: auth.currentUser.uid,
+                trip: newTrip,
+            });
+
+            await loadTrips();
             document.getElementById("newTrip").value = "";
             alert(`Destinasi baru "${newTrip}" berjaya ditambah!`);
         } else {
@@ -81,42 +87,48 @@ function handleAddTrip() {
 }
 
 // Handle clock form submission
-function handleClockFormSubmit(e) {
+async function handleClockFormSubmit(e) {
     e.preventDefault();
     const date = document.getElementById("date").value;
     const clockIn = document.getElementById("clockIn").value;
     const clockOut = document.getElementById("clockOut").value;
 
-    if (!dailyRecords[date]) {
-        dailyRecords[date] = { trips: [], clock_in: clockIn, clock_out: clockOut };
-    } else {
-        dailyRecords[date].clock_in = clockIn;
-        dailyRecords[date].clock_out = clockOut;
-    }
+    const recordRef = doc(recordsCollection, `${auth.currentUser.uid}_${date}`);
+    const recordSnap = await getDoc(recordRef);
 
-    saveToLocal();
-    updateReport();
+    let record = recordSnap.exists() ? recordSnap.data() : { trips: [] };
+
+    record.clock_in = clockIn;
+    record.clock_out = clockOut;
+
+    // Save to Firestore
+    await setDoc(recordRef, record);
+
+    await loadRecords();
 }
 
 // Handle trip form submission
-function handleTripFormSubmit(e) {
+async function handleTripFormSubmit(e) {
     e.preventDefault();
     const destination = document.getElementById("destination").value;
     const airwayBill = document.getElementById("airwayBill").value;
     const date = document.getElementById("date").value;
 
-    if (!dailyRecords[date]) {
-        dailyRecords[date] = { trips: [], clock_in: "", clock_out: "" };
-    }
+    const recordRef = doc(recordsCollection, `${auth.currentUser.uid}_${date}`);
+    const recordSnap = await getDoc(recordRef);
+
+    let record = recordSnap.exists() ? recordSnap.data() : { trips: [], clock_in: "", clock_out: "" };
 
     if (destination === "KLIA Cargo") {
-        dailyRecords[date].trips.push(`${destination} (${airwayBill})`);
+        record.trips.push(`${destination} (${airwayBill})`);
     } else {
-        dailyRecords[date].trips.push(destination);
+        record.trips.push(destination);
     }
 
-    saveToLocal();
-    updateReport();
+    // Save to Firestore
+    await setDoc(recordRef, record);
+
+    await loadRecords();
 
     document.getElementById("destination").value = "";
     document.getElementById("airwayBill").value = "";
@@ -124,37 +136,16 @@ function handleTripFormSubmit(e) {
 }
 
 // Delete a record by date
-function deleteRecord(date) {
+async function deleteRecord(date) {
     if (confirm(`Adakah anda pasti ingin memadam rekod untuk ${date}?`)) {
-        delete dailyRecords[date];
-        saveToLocal();
-        updateReport();
+        const recordRef = doc(recordsCollection, `${auth.currentUser.uid}_${date}`);
+        await deleteDoc(recordRef);
+        await loadRecords();
     }
 }
 
-// Helper functions
-function getCurrentMonthYear() {
-    const date = new Date();
-    const monthNames = [
-        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
-    ];
-    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-}
-
-function getMonthName(month) {
-    const monthNames = [
-        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
-    ];
-    return monthNames[parseInt(month) - 1];
-}
-
-function saveToLocal() {
-    localStorage.setItem(`dailyRecords_${currentMonthKey}`, JSON.stringify(dailyRecords));
-}
-
-function loadTrips() {
+// Load trips from Firestore
+async function loadTrips() {
     const destinationDropdown = document.getElementById("destination");
     destinationDropdown.innerHTML = "";
 
@@ -163,7 +154,12 @@ function loadTrips() {
     defaultOption.textContent = "-- Pilih Destinasi --";
     destinationDropdown.appendChild(defaultOption);
 
-    trips.forEach(trip => {
+    // Fetch trips from Firestore
+    const q = query(tripsCollection, where("userId", "==", auth.currentUser.uid));
+    const tripsSnapshot = await getDocs(q);
+    trips = tripsSnapshot.docs.map((doc) => doc.data().trip);
+
+    trips.forEach((trip) => {
         const option = document.createElement("option");
         option.value = trip;
         option.textContent = trip;
@@ -171,6 +167,44 @@ function loadTrips() {
     });
 }
 
+// Load records from Firestore
+async function loadRecords() {
+    const selectedMonth = document.getElementById("monthYear").value;
+    if (!selectedMonth) return;
+
+    const [year, month] = selectedMonth.split("-");
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${new Date(year, month, 0).getDate()}`;
+
+    const q = query(
+        recordsCollection,
+        where("userId", "==", auth.currentUser.uid),
+        where("date", ">=", startDate),
+        where("date", "<=", endDate)
+    );
+
+    const recordsSnapshot = await getDocs(q);
+    dailyRecords = {};
+    recordsSnapshot.forEach((doc) => {
+        dailyRecords[doc.id] = doc.data();
+    });
+
+    updateReport();
+}
+
+// Listen for real-time updates
+function listenForUpdates() {
+    const q = query(recordsCollection, where("userId", "==", auth.currentUser.uid));
+    onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added" || change.type === "modified") {
+                loadRecords();
+            }
+        });
+    });
+}
+
+// Update report table
 function updateReport() {
     let totalOT = 0;
     const tbody = document.querySelector("#reportTable tbody");
@@ -184,7 +218,7 @@ function updateReport() {
 
     const sortedDates = Object.keys(dailyRecords).sort((a, b) => new Date(a) - new Date(b));
 
-    sortedDates.forEach(date => {
+    sortedDates.forEach((date) => {
         const record = dailyRecords[date];
         const otHours = calculateOT(record.clock_in, record.clock_out, date, record.trips);
         totalOT += otHours;
@@ -204,12 +238,30 @@ function updateReport() {
             <td>${otHours.toFixed(2)}</td>
             <td class="print-only"></td>
             <td class="print-only"></td>
-            <td><button class="delete-btn" onclick="deleteRecord('${date}')">Padam</button></td>
+            <td><button onclick="deleteRecord('${date}')">Padam</button></td>
         `;
         tbody.appendChild(row);
     });
 
     document.getElementById("totalOT").textContent = totalOT.toFixed(2);
+}
+
+// Helper functions
+function getCurrentMonthYear() {
+    const date = new Date();
+    const monthNames = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ];
+    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function getMonthName(month) {
+    const monthNames = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ];
+    return monthNames[parseInt(month) - 1];
 }
 
 function formatDateForPDF(date) {
@@ -244,7 +296,7 @@ function calculateOT(clockIn, clockOut, date, trips) {
         otMinutes = adjustedEndTime - startTime;
     } else {
         // For other days, check for "KLIA Cargo" trips
-        if (trips.some(trip => trip.startsWith("KLIA Cargo"))) return 0;
+        if (trips.some((trip) => trip.startsWith("KLIA Cargo"))) return 0;
 
         if (new Date(date).getDay() === 6) {
             // Saturday: OT starts after 14:00
@@ -271,19 +323,19 @@ function exportToPDF() {
 
     const tableData = [];
     Object.keys(dailyRecords)
-    .sort((a, b) => new Date(a) - new Date(b)) // Susun ikut tarikh
-    .forEach(date => {
-        const record = dailyRecords[date];
-        tableData.push([
-            formatDateForPDF(date),
-            record.trips.join(", ") || "Tiada destinasi",
-            formatTime(record.clock_in),
-            formatTime(record.clock_out),
-            calculateOT(record.clock_in, record.clock_out, date, record.trips).toFixed(2),
-            "",
-            ""
-        ]);
-    });
+        .sort((a, b) => new Date(a) - new Date(b)) // Sort by date
+        .forEach((date) => {
+            const record = dailyRecords[date];
+            tableData.push([
+                formatDateForPDF(date),
+                record.trips.join(", ") || "Tiada destinasi",
+                formatTime(record.clock_in),
+                formatTime(record.clock_out),
+                calculateOT(record.clock_in, record.clock_out, date, record.trips).toFixed(2),
+                "",
+                ""
+            ]);
+        });
 
     doc.autoTable({
         startY: 42,
@@ -293,13 +345,13 @@ function exportToPDF() {
         headStyles: { fillColor: [200, 200, 200], fontSize: 10 },
         theme: "grid",
         columnStyles: {
-            0: { cellWidth: 25 },  // Tarikh
-            1: { cellWidth: 55 },  // Destinasi
-            2: { cellWidth: 20 },  // Clock-In
-            3: { cellWidth: 20 },  // Clock-Out
-            4: { cellWidth: 15 },  // OT Hours
-            5: { cellWidth: 25 },  // Tandatangan Anda
-            6: { cellWidth: 25 }   // Tandatangan Penyelia
+            0: { cellWidth: 25 }, // Tarikh
+            1: { cellWidth: 55 }, // Destinasi
+            2: { cellWidth: 20 }, // Clock-In
+            3: { cellWidth: 20 }, // Clock-Out
+            4: { cellWidth: 15 }, // OT Hours
+            5: { cellWidth: 25 }, // Tandatangan Anda
+            6: { cellWidth: 25 }  // Tandatangan Penyelia
         }
     });
 
