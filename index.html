@@ -111,20 +111,23 @@
 <!-- Include jsPDF and AutoTable -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="script.js"></script>
+
+<!-- Include JavaScript Files -->
+<script src="constants.js"></script>
+<script src="utils.js"></script>
+<script src="main.js"></script>
 
 <!-- Register Service Worker -->
 <script>
     if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").then(registration => {
-            console.log("Service Worker registered with scope:", registration.scope);
-        }).catch(error => {
-            console.error("Service Worker registration failed:", error);
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("sw.js").then(registration => {
+                console.log("Service Worker registered with scope:", registration.scope);
+            }).catch(error => {
+                console.error("Service Worker registration failed:", error);
+            });
         });
-    });
-}
-
+    }
 </script>
 </body>
 </html>
