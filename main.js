@@ -1,25 +1,3 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
-// Supabase Credentials
-const SUPABASE_URL = "https://zmbzuhvvfnaynhelcgxz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYnp1aHZ2Zm5heW5oZWxjZ3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyODgyMTQsImV4cCI6MjA1Njg2NDIxNH0.PSqNoR8AXFlZny1PCkY8jiJLRJJRtXsJGW_-_eDOMwM";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Function untuk fetch attendance data
-async function getAttendance() {
-    const { data, error } = await supabase.from('attendance').select('*');
-
-    if (error) {
-        console.error("❌ Error fetch data:", error);
-    } else {
-        console.log("✅ Attendance Data:", data);
-    }
-}
-
-// Panggil function bila page load
-getAttendance();
-
 // State
 let trips = JSON.parse(localStorage.getItem("trips")) || defaultTrips;
 let currentMonthKey = getCurrentMonthYear();
